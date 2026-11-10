@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: incident_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:? Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: incident_db
+
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: 
+        - CMD-SHELL 
+        - pg_isready -U incident_user -d incident_db
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://incident_user:${POSTGRES_PASSWORD}@postgres:5432/incident_db
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+volumes:
+  postgres_data:
