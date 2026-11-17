@@ -1,0 +1,77 @@
+---
+- name: Install Kubernetes components
+  hosts: k8s_cluster
+  become: true
+
+  vars:
+    kubernetes_version: "v1.36"
+    kubernetes_repo_url: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/"
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+          - gpg
+          - apt-transport-https
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create APT keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Kubernetes repository signing key
+      ansible.builtin.get_url:
+        url: "{{ kubernetes_repo_url }}Release.key"
+        dest: /etc/apt/keyrings/kubernetes-release.key
+        mode: "0644"
+      register: kubernetes_key
+
+    
+    - name: Check whether Kubernetes GPG keyring exists
+      ansible.builtin.stat:
+        path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      register: kubernetes_gpg_keyring
+
+    - name: Convert signing key to GPG keyring
+      ansible.builtin.command:
+        cmd: >-
+          gpg --batch --yes --dearmor
+          -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          /etc/apt/keyrings/kubernetes-release.key
+      when: kubernetes_key.changed or not kubernetes_gpg_keyring.stat.exists
+        
+    - name: Configure Kubernetes APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] {{ kubernetes_repo_url }} /"
+        filename: kubernetes
+        state: present
+        update_cache: true
+
+    - name: Install Kubernetes components
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+
+    - name: Hold Kubernetes packages
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Enable kubelet service
+      ansible.builtin.systemd_service:
+        name: kubelet
+        enabled: true
+

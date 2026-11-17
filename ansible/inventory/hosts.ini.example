@@ -1,0 +1,9 @@
+[control_plane]
+k8s-control ansible_host=CONTROL_PLANE_PUBLIC_IP
+
+[workers]
+k8s-worker ansible_host=WORKER_PUBLIC_IP
+
+[k8s_cluster:children]
+control_plane
+workers

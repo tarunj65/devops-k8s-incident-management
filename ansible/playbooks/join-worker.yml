@@ -1,0 +1,52 @@
+---
+- name: Generate Kubernetes worker join command
+  hosts: control_plane
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Generate temporary worker join command
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - token
+          - create
+          - --ttl
+          - 30m
+          - --print-join-command
+      register: worker_join_command
+      changed_when: true
+      no_log: true
+
+- name: Join worker nodes to Kubernetes cluster
+  hosts: workers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check whether worker is already joined
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: worker_kubelet_config
+
+    - name: Join worker to Kubernetes control plane
+      ansible.builtin.command:
+        argv: >-
+          {{
+            hostvars[groups['control_plane'][0]]
+            .worker_join_command.stdout.split()
+            + [
+                '--cri-socket',
+                'unix:///run/containerd/containerd.sock'
+              ]
+          }}
+      when: not worker_kubelet_config.stat.exists
+      register: worker_join_result
+      no_log: true
+
+    - name: Ensure kubelet service is enabled and running
+      ansible.builtin.systemd_service:
+        name: kubelet
+        enabled: true
+        state: started
+

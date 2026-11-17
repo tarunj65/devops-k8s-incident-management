@@ -1,0 +1,45 @@
+---
+- name: Initialize Kubernetes control plane
+  hosts: control_plane
+  become: true
+
+  vars:
+    control_plane_ip: "10.0.1.89"
+    pod_network_cidr: "192.168.0.0/16"
+    cri_socket: "unix:///run/containerd/containerd.sock"
+
+  tasks:
+    - name: Check whether Kubernetes is already initialized
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubernetes_admin_conf
+
+    - name: Initialize Kubernetes control plane
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - init
+          - "--apiserver-advertise-address={{ control_plane_ip }}"
+          - "--pod-network-cidr={{ pod_network_cidr }}"
+          - "--cri-socket={{ cri_socket }}"
+        creates: /etc/kubernetes/admin.conf
+      when: not kubernetes_admin_conf.stat.exists
+      register: kubeadm_init_result
+
+    - name: Create kubectl configuration directory
+      ansible.builtin.file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0700"
+
+    - name: Configure kubectl for ubuntu user
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: true
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+

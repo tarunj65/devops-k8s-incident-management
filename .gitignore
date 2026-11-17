@@ -22,8 +22,37 @@ __pycache__/
 !*.tfvars.example
 crash.log
 
-# Ansible
-*.retry
 
 # Local files
 .DS_Store
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+!*.tfvars.example
+
+# Ansible
+ansible/inventory/hosts.ini
+*.retry
+
+# Kubernetes credentials
+**/admin.conf
+**/.kube/config
+**/kubeconfig
+**/kubeconfig.yaml
+
+# SSH credentials
+*.pem
+*.key
+id_rsa
+id_ed25519
+
